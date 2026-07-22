@@ -14,7 +14,9 @@ export const openapiSpec = {
     { name: "Usuário", description: "Dados e estatísticas do usuário" },
     { name: "Cursos", description: "Trilha, cursos e matrícula" },
     { name: "Aulas", description: "Conteúdo e progresso das aulas" },
+    { name: "Anotações", description: "Anotações pessoais do aluno por aula" },
     { name: "Quiz", description: "Exercícios e tentativas" },
+    { name: "IA", description: "Recursos com LLM: correção, explicação, geração e tutor" },
   ],
   components: {
     securitySchemes: {
@@ -145,6 +147,16 @@ export const openapiSpec = {
               },
             },
           },
+        },
+      },
+      Anotacao: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          texto: { type: "string" },
+          aulaId: { type: "string", format: "uuid" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
         },
       },
       ResultadoTentativa: {
@@ -381,6 +393,106 @@ export const openapiSpec = {
         },
       },
     },
+    "/aulas/{id}/anotacoes": {
+      get: {
+        tags: ["Anotações"],
+        summary: "Lista as anotações do aluno na aula",
+        security: bearerAuth,
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": {
+            description: "OK",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/Anotacao" },
+                },
+              },
+            },
+          },
+          "404": { description: "Aula não encontrada" },
+        },
+      },
+      post: {
+        tags: ["Anotações"],
+        summary: "Cria uma anotação na aula",
+        security: bearerAuth,
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["texto"],
+                properties: { texto: { type: "string", minLength: 1 } },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Criada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/Anotacao" },
+              },
+            },
+          },
+          "404": { description: "Aula não encontrada" },
+        },
+      },
+    },
+    "/anotacoes/{id}": {
+      put: {
+        tags: ["Anotações"],
+        summary: "Edita uma anotação do próprio aluno",
+        security: bearerAuth,
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["texto"],
+                properties: { texto: { type: "string", minLength: 1 } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "OK",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/Anotacao" },
+              },
+            },
+          },
+          "404": { description: "Anotação não encontrada" },
+        },
+      },
+      delete: {
+        tags: ["Anotações"],
+        summary: "Exclui uma anotação do próprio aluno",
+        security: bearerAuth,
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "204": { description: "Excluída" },
+          "404": { description: "Anotação não encontrada" },
+        },
+      },
+    },
     "/quiz/{id}": {
       get: {
         tags: ["Quiz"],
@@ -438,6 +550,183 @@ export const openapiSpec = {
             },
           },
           "404": { description: "Quiz não encontrado" },
+        },
+      },
+    },
+    "/ai/corrigir": {
+      post: {
+        tags: ["IA"],
+        summary: "Corrige uma frase em inglês",
+        security: bearerAuth,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["frase"],
+                properties: { frase: { type: "string", example: "I has a cat" } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "OK",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    correta: { type: "string" },
+                    temErro: { type: "boolean" },
+                    explicacao: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          "502": { description: "Falha no provedor de LLM" },
+        },
+      },
+    },
+    "/ai/explicar": {
+      post: {
+        tags: ["IA"],
+        summary: "Explica uma dúvida de gramática/vocabulário",
+        security: bearerAuth,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["pergunta"],
+                properties: {
+                  pergunta: {
+                    type: "string",
+                    example: "Quando usar have e has?",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "OK",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { explicacao: { type: "string" } },
+                },
+              },
+            },
+          },
+          "502": { description: "Falha no provedor de LLM" },
+        },
+      },
+    },
+    "/ai/exercicios": {
+      post: {
+        tags: ["IA"],
+        summary: "Gera questões de múltipla escolha sobre um tema",
+        security: bearerAuth,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["tema"],
+                properties: {
+                  tema: { type: "string", example: "presente simples" },
+                  nivel: { type: "string", example: "A1" },
+                  quantidade: { type: "integer", minimum: 1, maximum: 10, default: 3 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "OK",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    questoes: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          enunciado: { type: "string" },
+                          alternativas: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                texto: { type: "string" },
+                                correta: { type: "boolean" },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "502": { description: "Falha no provedor de LLM" },
+        },
+      },
+    },
+    "/ai/tutor": {
+      post: {
+        tags: ["IA"],
+        summary: "Conversa com o tutor de inglês",
+        security: bearerAuth,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["mensagens"],
+                properties: {
+                  mensagens: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        role: { type: "string", enum: ["user", "assistant"] },
+                        content: { type: "string" },
+                      },
+                    },
+                    example: [{ role: "user", content: "How do I say bom dia?" }],
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "OK",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { resposta: { type: "string" } },
+                },
+              },
+            },
+          },
+          "502": { description: "Falha no provedor de LLM" },
         },
       },
     },
