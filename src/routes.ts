@@ -6,7 +6,9 @@ import { authService } from "./services/auth.service.js";
 import { userService } from "./services/user.service.js";
 import { cursoService } from "./services/curso.service.js";
 import { aulaService } from "./services/aula.service.js";
+import { anotacaoService } from "./services/anotacao.service.js";
 import { quizService } from "./services/quiz.service.js";
+import { aiService } from "./services/ai.service.js";
 
 export const router = Router();
 
@@ -102,6 +104,43 @@ router.get(
   })
 );
 
+const anotacaoSchema = z.object({ texto: z.string().min(1) });
+
+router.get(
+  "/aulas/:id/anotacoes",
+  auth,
+  asyncHandler(async (req, res) => {
+    res.json(await anotacaoService.listar(req.params.id, req.userId!));
+  })
+);
+
+router.post(
+  "/aulas/:id/anotacoes",
+  auth,
+  asyncHandler(async (req, res) => {
+    const { texto } = anotacaoSchema.parse(req.body);
+    res.status(201).json(await anotacaoService.criar(req.params.id, req.userId!, texto));
+  })
+);
+
+router.put(
+  "/anotacoes/:id",
+  auth,
+  asyncHandler(async (req, res) => {
+    const { texto } = anotacaoSchema.parse(req.body);
+    res.json(await anotacaoService.atualizar(req.params.id, req.userId!, texto));
+  })
+);
+
+router.delete(
+  "/anotacoes/:id",
+  auth,
+  asyncHandler(async (req, res) => {
+    await anotacaoService.excluir(req.params.id, req.userId!);
+    res.status(204).send();
+  })
+);
+
 const tentativaSchema = z.object({
   respostas: z.record(z.string(), z.string()),
 });
@@ -112,5 +151,60 @@ router.post(
   asyncHandler(async (req, res) => {
     const { respostas } = tentativaSchema.parse(req.body);
     res.json(await quizService.tentar(req.params.id, req.userId!, respostas));
+  })
+);
+
+const corrigirSchema = z.object({ frase: z.string().min(1).max(500) });
+const explicarSchema = z.object({ pergunta: z.string().min(1).max(500) });
+const exerciciosSchema = z.object({
+  tema: z.string().min(1).max(120),
+  nivel: z.string().default("A1"),
+  quantidade: z.number().int().min(1).max(10).default(3),
+});
+const tutorSchema = z.object({
+  mensagens: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1),
+      })
+    )
+    .min(1)
+    .max(20),
+});
+
+router.post(
+  "/ai/corrigir",
+  auth,
+  asyncHandler(async (req, res) => {
+    const { frase } = corrigirSchema.parse(req.body);
+    res.json(await aiService.corrigirFrase(frase));
+  })
+);
+
+router.post(
+  "/ai/explicar",
+  auth,
+  asyncHandler(async (req, res) => {
+    const { pergunta } = explicarSchema.parse(req.body);
+    res.json(await aiService.explicarDuvida(pergunta));
+  })
+);
+
+router.post(
+  "/ai/exercicios",
+  auth,
+  asyncHandler(async (req, res) => {
+    const { tema, nivel, quantidade } = exerciciosSchema.parse(req.body);
+    res.json(await aiService.gerarExercicios(tema, nivel, quantidade));
+  })
+);
+
+router.post(
+  "/ai/tutor",
+  auth,
+  asyncHandler(async (req, res) => {
+    const { mensagens } = tutorSchema.parse(req.body);
+    res.json(await aiService.tutor(mensagens));
   })
 );
