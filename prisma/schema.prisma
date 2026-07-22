@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ALUNO
+  INSTRUTOR
+  ADMIN
+}
+
+enum StatusCurso {
+  RASCUNHO
+  PUBLICADO
+}
+
+enum TipoConteudo {
+  VIDEO
+  TEXTO
+}
+
+model User {
+  id            String          @id @default(uuid())
+  nome          String
+  email         String          @unique
+  senhaHash     String
+  role          Role            @default(ALUNO)
+  xp            Int             @default(0)
+  streak        Int             @default(0)
+  ultimoEstudo  DateTime?
+  matriculas    Matricula[]
+  progresso     ProgressoAula[]
+  anotacoes     Anotacao[]
+  tentativas    TentativaQuiz[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model Categoria {
+  id     String  @id @default(uuid())
+  nome   String  @unique
+  cursos Curso[]
+}
+
+model Curso {
+  id          String      @id @default(uuid())
+  titulo      String
+  descricao   String?
+  capaUrl     String?
+  cor         String      @default("indigo")
+  nivel       String      @default("A1")
+  status      StatusCurso @default(RASCUNHO)
+  categoria   Categoria?  @relation(fields: [categoriaId], references: [id])
+  categoriaId String?
+  modulos     Modulo[]
+  matriculas  Matricula[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Modulo {
+  id        String   @id @default(uuid())
+  titulo    String
+  ordem     Int
+  curso     Curso    @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  cursoId   String
+  aulas     Aula[]
+  quizzes   Quiz[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cursoId, ordem])
+}
+
+model Aula {
+  id         String          @id @default(uuid())
+  titulo     String
+  ordem      Int
+  tipo       TipoConteudo    @default(TEXTO)
+  videoUrl   String?
+  conteudo   String?
+  duracaoSeg Int?
+  xp         Int             @default(10)
+  modulo     Modulo          @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  moduloId   String
+  progresso  ProgressoAula[]
+  anotacoes  Anotacao[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([moduloId, ordem])
+}
+
+model Matricula {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  curso     Curso    @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  cursoId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, cursoId])
+}
+
+model ProgressoAula {
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  aula        Aula     @relation(fields: [aulaId], references: [id], onDelete: Cascade)
+  aulaId      String
+  concluida   Boolean  @default(true)
+  concluidaEm DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, aulaId])
+}
+
+model Anotacao {
+  id        String   @id @default(uuid())
+  texto     String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  aula      Aula     @relation(fields: [aulaId], references: [id], onDelete: Cascade)
+  aulaId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Quiz {
+  id         String          @id @default(uuid())
+  titulo     String
+  modulo     Modulo          @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  moduloId   String
+  questoes   Questao[]
+  tentativas TentativaQuiz[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+model Questao {
+  id           String        @id @default(uuid())
+  enunciado    String
+  ordem        Int
+  quiz         Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId       String
+  alternativas Alternativa[]
+
+  @@unique([quizId, ordem])
+}
+
+model Alternativa {
+  id        String  @id @default(uuid())
+  texto     String
+  correta   Boolean @default(false)
+  questao   Questao @relation(fields: [questaoId], references: [id], onDelete: Cascade)
+  questaoId String
+}
+
+model TentativaQuiz {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId    String
+  pontuacao Float
+  respostas Json
+  createdAt DateTime @default(now())
+}
